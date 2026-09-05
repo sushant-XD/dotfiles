@@ -16,13 +16,15 @@ Then open a new terminal, or run `source ~/.zshrc` once.
 ## What bootstrap does
 
 1. Detects apt / dnf / Homebrew and installs required tools (zsh, neovim, tmux, fzf, ripgrep, node, build tools, …). Homebrew is best-effort / untested.
-2. If a managed config already exists (nvim, tmux, ghostty, or `~/.p10k.zsh`), it is moved into `backup/` and replaced with a symlink into this repo. If `backup/` already exists, you are asked whether to overwrite it; answering no aborts. Paths that are already linked here are left alone.
-3. Symlinks:
+2. Asks separately whether to set up neovim, tmux, ghostty, and zsh (Enter = yes, `n` = skip).
+3. For each accepted app: if a config already exists, it is moved into `backup/` and replaced with a symlink (zsh: p10k symlink + `source` line in `~/.zshrc`). If `backup/` already exists, you are asked whether to overwrite it; answering no aborts. Paths already linked here are left alone.
+4. Symlinks (when enabled):
    - `~/.config/nvim` → `nvim/`
    - `~/.config/tmux` → `tmux/`
    - `~/.config/ghostty` → `ghostty/`
    - `~/.p10k.zsh` → `zsh/p10k.zsh`
-4. Ensures `~/.zshrc` sources `zsh/zshrc` (creates or appends one line). Does **not** replace or symlink `~/.zshrc`, so machine-local exports stay put.
+5. For zsh, ensures `~/.zshrc` sources `zsh/zshrc` (creates or appends one line). Does **not** replace or symlink `~/.zshrc`.
+6. Warns if an enabled tool is missing or below the minimum version (does not abort).
 
 ## Layout
 

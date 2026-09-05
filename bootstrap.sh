@@ -143,6 +143,7 @@ backup_if_needed() {
     esac
   fi
 
+  ensure_backup_root
   echo "Backing up $src -> $dest"
   run_cmd mv "$src" "$dest"
 }
@@ -169,7 +170,21 @@ link_config() {
   run_cmd ln -s "$src" "$dest"
 }
 
-backup_and_link() {
+confirm() {
+  local reply
+  read -r -p "$1 [Y/n] " reply
+  case "$reply" in
+    ""|y|Y|yes|YES) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Prepare backup/ once (prompt to overwrite if it already exists).
+ensure_backup_root() {
+  if [[ -n "${BACKUP_READY:-}" ]]; then
+    return 0
+  fi
+
   if [[ -e "$BACKUP_ROOT" ]]; then
     local reply
     read -r -p "Backup already exists at $BACKUP_ROOT. Overwrite? [y/N] " reply
@@ -184,29 +199,13 @@ backup_and_link() {
     run_cmd rm -rf "$BACKUP_ROOT"
   fi
 
-  echo
-  echo "Backing up existing configs to $BACKUP_ROOT"
   run_cmd mkdir -p "$BACKUP_ROOT"
-
-  backup_if_needed "$NVIM_LINK" "$BACKUP_ROOT/nvim"
-  backup_if_needed "$TMUX_LINK" "$BACKUP_ROOT/tmux"
-  backup_if_needed "$GHOSTTY_LINK" "$BACKUP_ROOT/ghostty"
-  backup_if_needed "$P10K_LINK" "$BACKUP_ROOT/p10k.zsh"
-
-  echo
-  echo "Creating symlinks..."
-  run_cmd mkdir -p "$CONFIG_HOME"
-
-  link_config "$NVIM_SRC" "$NVIM_LINK"
-  link_config "$TMUX_SRC" "$TMUX_LINK"
-  link_config "$GHOSTTY_SRC" "$GHOSTTY_LINK"
-  link_config "$P10K_SRC" "$P10K_LINK"
+  BACKUP_READY=1
 }
 
 wire_zshrc() {
   local line="source \"$ZSHRC_SRC\""
 
-  echo
   echo "Wiring ~/.zshrc -> $ZSHRC_SRC"
 
   if [[ ! -f "$ZSHRC_FILE" ]]; then
@@ -228,10 +227,125 @@ wire_zshrc() {
   fi
 }
 
+SETUP_NVIM=0
+SETUP_TMUX=0
+SETUP_GHOSTTY=0
+SETUP_ZSH=0
+
+setup_nvim() {
+  echo
+  if ! confirm "Set up neovim config?"; then
+    echo "Skipping neovim"
+    return 0
+  fi
+  SETUP_NVIM=1
+  run_cmd mkdir -p "$CONFIG_HOME"
+  backup_if_needed "$NVIM_LINK" "$BACKUP_ROOT/nvim"
+  link_config "$NVIM_SRC" "$NVIM_LINK"
+}
+
+setup_tmux() {
+  echo
+  if ! confirm "Set up tmux config?"; then
+    echo "Skipping tmux"
+    return 0
+  fi
+  SETUP_TMUX=1
+  run_cmd mkdir -p "$CONFIG_HOME"
+  backup_if_needed "$TMUX_LINK" "$BACKUP_ROOT/tmux"
+  link_config "$TMUX_SRC" "$TMUX_LINK"
+}
+
+setup_ghostty() {
+  echo
+  if ! confirm "Set up ghostty config?"; then
+    echo "Skipping ghostty"
+    return 0
+  fi
+  SETUP_GHOSTTY=1
+  run_cmd mkdir -p "$CONFIG_HOME"
+  backup_if_needed "$GHOSTTY_LINK" "$BACKUP_ROOT/ghostty"
+  link_config "$GHOSTTY_SRC" "$GHOSTTY_LINK"
+}
+
+setup_zsh() {
+  echo
+  if ! confirm "Set up zsh config (p10k symlink + source zshrc)?"; then
+    echo "Skipping zsh"
+    return 0
+  fi
+  SETUP_ZSH=1
+  backup_if_needed "$P10K_LINK" "$BACKUP_ROOT/p10k.zsh"
+  link_config "$P10K_SRC" "$P10K_LINK"
+  wire_zshrc
+}
+
+setup_configs() {
+  echo
+  echo "Choose which configs to set up (Enter = yes, n = skip):"
+  setup_nvim
+  setup_tmux
+  setup_ghostty
+  setup_zsh
+}
+
+# Extract leading X.Y or X.Y.Z from a version string.
+normalize_version() {
+  echo "$1" | grep -oE '[0-9]+(\.[0-9]+)+' | head -1
+}
+
+# Return 0 if version $1 >= minimum $2 (both numeric dotted).
+version_ge() {
+  local current="$1"
+  local minimum="$2"
+  [[ "$(printf '%s\n%s\n' "$minimum" "$current" | sort -V | head -1)" == "$minimum" ]]
+}
+
+# Warn if binary missing or older than minimum. Does not abort.
+check_version() {
+  local name="$1"
+  local bin="$2"
+  local minimum="$3"
+  local version_flag="${4:---version}"
+
+  if ! command -v "$bin" >/dev/null 2>&1; then
+    echo "Warning: $name not found. Config may not work; install $name >= $minimum."
+    return 0
+  fi
+
+  local raw current
+  raw="$("$bin" $version_flag 2>&1 | head -1)"
+  current="$(normalize_version "$raw")"
+
+  if [[ -z "$current" ]]; then
+    echo "Warning: could not parse $name version from: $raw"
+    return 0
+  fi
+
+  if version_ge "$current" "$minimum"; then
+    echo "$name $current OK (>= $minimum)"
+  else
+    echo "Warning: $name $current is older than $minimum. Config may not work properly; please update $name to $minimum or newer."
+  fi
+}
+
+check_versions() {
+  if (( SETUP_NVIM == 0 && SETUP_TMUX == 0 && SETUP_GHOSTTY == 0 && SETUP_ZSH == 0 )); then
+    return 0
+  fi
+
+  echo
+  echo "Checking tool versions..."
+  (( SETUP_NVIM )) && check_version "neovim" nvim "0.12.0"
+  (( SETUP_TMUX )) && check_version "tmux" tmux "3.2" "-V"
+  (( SETUP_GHOSTTY )) && check_version "ghostty" ghostty "1.0.0"
+  (( SETUP_ZSH )) && check_version "zsh" zsh "5.8"
+}
+
 # --- main ---
 
 parse_args "$@"
 detect_os
 install_packages
-backup_and_link
-wire_zshrc
+setup_configs
+check_versions
