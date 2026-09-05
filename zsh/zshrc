@@ -58,9 +58,25 @@ alias vim='nvim'
 alias c='clear'
 
 # Shell integrations
-eval "$(fzf --zsh)"
+# fzf --zsh needs >= 0.48; older distro packages use shell script files instead.
+if (( $+commands[fzf] )); then
+  if fzf --help 2>&1 | grep -qF -- '--zsh'; then
+    eval "$(fzf --zsh)"
+  else
+    for _fzf_file in \
+      /usr/share/fzf/shell/key-bindings.zsh \
+      /usr/share/fzf/key-bindings.zsh \
+      /usr/share/doc/fzf/examples/key-bindings.zsh \
+      /usr/share/fzf/shell/completion.zsh \
+      /usr/share/fzf/completion.zsh \
+      /usr/share/doc/fzf/examples/completion.zsh
+    do
+      [[ -f $_fzf_file ]] && source $_fzf_file
+    done
+    unset _fzf_file
+  fi
+fi
 # eval "$(zoxide init --cmd cd zsh)"
 export PATH="$HOME/.local/bin:$PATH"
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
-. "/home/wingman/.deno/env"
