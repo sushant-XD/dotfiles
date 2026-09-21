@@ -13,9 +13,7 @@ if [ ! -d "$ZINIT_HOME" ]; then
 fi
 
 source "${ZINIT_HOME}/zinit.zsh"
-zinit ice depth=1;zinit light romkatv/powerlevel10k
 
-zinit light zsh-users/zsh-syntax-highlighting
 zinit light zsh-users/zsh-completions
 zinit light zsh-users/zsh-autosuggestions
 zinit light Aloxaf/fzf-tab
@@ -78,5 +76,5 @@ if (( $+commands[fzf] )); then
 fi
 # eval "$(zoxide init --cmd cd zsh)"
 export PATH="$HOME/.local/bin:$PATH"
-# To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
-[[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
+eval "$(starship init zsh)"
+zinit light zsh-users/zsh-syntax-highlighting

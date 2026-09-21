@@ -1,1 +1,3 @@
+cursor-style = bar
 shell-integration-features = sudo
+cursor-style-blink = false
