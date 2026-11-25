@@ -8,13 +8,11 @@ CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 NVIM_SRC="$DOTFILES/nvim"
 TMUX_SRC="$DOTFILES/tmux"
 GHOSTTY_SRC="$DOTFILES/ghostty"
-P10K_SRC="$DOTFILES/zsh/p10k.zsh"
 ZSHRC_SRC="$DOTFILES/zsh/zshrc"
 
 NVIM_LINK="$CONFIG_HOME/nvim"
 TMUX_LINK="$CONFIG_HOME/tmux"
 GHOSTTY_LINK="$CONFIG_HOME/ghostty"
-P10K_LINK="$HOME/.p10k.zsh"
 ZSHRC_FILE="$HOME/.zshrc"
 
 DRY_RUN=0
@@ -90,6 +88,7 @@ install_common_deps() {
   install_deps neovim nvim
   install_deps tmux
   install_deps curl
+  install_deps git
   install_deps fzf
   install_deps ripgrep rg
   install_deps cmake
@@ -121,6 +120,25 @@ install_packages() {
       install_deps node
       ;;
   esac
+}
+
+install_starship() {
+  export PATH="$HOME/.local/bin:$PATH"
+  if command -v starship >/dev/null 2>&1; then
+    echo "starship already installed"
+    return 0
+  fi
+  echo "Installing starship..."
+  if [[ "$PKG_MGR" == "brew" ]]; then
+    run_cmd brew install starship
+  else
+    run_cmd mkdir -p "$HOME/.local/bin"
+    if (( DRY_RUN )); then
+      echo "[dry-run] curl -sS https://starship.rs/install.sh | sh -s -- -y -b $HOME/.local/bin"
+    else
+      curl -sS https://starship.rs/install.sh | sh -s -- -y -b "$HOME/.local/bin"
+    fi
+  fi
 }
 
 backup_if_needed() {
@@ -270,13 +288,12 @@ setup_ghostty() {
 
 setup_zsh() {
   echo
-  if ! confirm "Set up zsh config (p10k symlink + source zshrc)?"; then
+  if ! confirm "Set up zsh config (starship symlink + source zshrc)?"; then
     echo "Skipping zsh"
     return 0
   fi
+  install_starship
   SETUP_ZSH=1
-  backup_if_needed "$P10K_LINK" "$BACKUP_ROOT/p10k.zsh"
-  link_config "$P10K_SRC" "$P10K_LINK"
   wire_zshrc
 }
 
